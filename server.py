@@ -19,75 +19,66 @@ if LOG_PATH:
     except Exception as e:
         print(f"Warning: Could not create log file: {e}")
 
+def log_message(log_file, message: str) -> None:
+    """Helper function to write to log file if enabled."""
+    if log_file is not None:
+        log_file.write(message)
+        log_file.flush()
+
 def execute_command(cmd: list[str]) -> str:
     """Execute a command and return its output, truncated if necessary."""
+    log_file = open(LOG_PATH, 'a') if LOG_PATH else None
+
     try:
         output_lines = []
         total_length = 0
         truncated = False
-        
+
         # Add command and separator to output
         command_line = f"$ {' '.join(cmd)}"
         separator = '=' * len(command_line)
         command_str = f"\n{command_line}\n{separator}\n\n"
         output_lines.append(command_str)
         total_length += len(command_str)
-        
+
         # Log command if logging enabled
-        if LOG_PATH:
-            with open(LOG_PATH, 'a') as log_file:
-                log_file.write(command_str)
-                log_file.flush()
-        
-        process = subprocess.Popen(
-            cmd,
-            cwd=DJANGO_PATH,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            bufsize=1,
-            universal_newlines=True
-        )
-        
-        while True:
-            line = process.stdout.readline()
-            if not line and process.poll() is not None:
-                break
-            
-            if line:
-                if LOG_PATH:
-                    with open(LOG_PATH, 'a') as log_file:
-                        log_file.write(line)
-                        log_file.flush()
-                
-                if not truncated:
-                    new_length = total_length + len(line)
-                    if new_length <= MAX_OUTPUT:
-                        output_lines.append(line)
-                        total_length = new_length
-                    else:
-                        truncated = True
-        
+        log_message(log_file, command_str)
+
+        process = subprocess.Popen(cmd, cwd=DJANGO_PATH, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                                   bufsize=1, universal_newlines=True)
+
+        for line in iter(process.stdout.readline, ''):
+            # Always log the full output
+            log_message(log_file, line)
+
+            # Handle truncation for returned output
+            new_length = total_length + len(line)
+            if not truncated and new_length <= MAX_OUTPUT:
+                output_lines.append(line)
+                total_length = new_length
+            elif not truncated:
+                truncated = True
+                log_message(log_file, "[TRUNCATED FOR LLM]\n")
+
         return_code = process.wait()
         stderr = process.stderr.read()
-        
+
         if return_code != 0:
-            if LOG_PATH:
-                with open(LOG_PATH, 'a') as log_file:
-                    log_file.write(f"Error executing command: {stderr}\n")
+            log_message(log_file, f"Error executing command: {stderr}\n")
             return f"Error executing command: {stderr}"
-            
+
         output = ''.join(output_lines)
         if truncated:
             output += "[TRUNCATED]"
-            
+
         return output
-        
+
     except Exception as e:
-        if LOG_PATH:
-            with open(LOG_PATH, 'a') as log_file:
-                log_file.write(f"Error executing command: {str(e)}\n")
+        log_message(log_file, f"Error executing command: {str(e)}\n")
         return f"Error executing command: {str(e)}"
+    finally:
+        if log_file is not None:
+            log_file.close()
 
 mcp = FastMCP("Django MCP")
 
