@@ -82,18 +82,17 @@ def execute_command(cmd: list[str]) -> str:
 
 mcp = FastMCP("Django MCP")
 
-@mcp.tool(description=f"Returns the output of `python manage.py` for the django project at {DJANGO_PATH}")
+@mcp.tool(description=f"Returns all available Django management commands for the project at {DJANGO_PATH}")
 def list_management_commands() -> str:
     """List all available Django management commands."""
     return execute_command([PYTHON_PATH, "manage.py"])
 
-@mcp.tool(description=
-          f"Returns the output of `python manage.py help [command_name]` for the django project at {DJANGO_PATH}")
+@mcp.tool(description=f"Returns help for a specific Django management command for the project at {DJANGO_PATH}")
 def help_management_command(command_name: str) -> str:
     """Get help for a specific Django management command."""
     return execute_command([PYTHON_PATH, "manage.py", command_name, "--help"])
 
-@mcp.tool(description=f"Run `python manage.py [command_name] [options]` for the django project at {DJANGO_PATH}")
+@mcp.tool(description=f"Run a Django management command with optional arguments for the project at {DJANGO_PATH}")
 def run_management_command(command_name: str, options: Optional[list[str]] = None) -> str:
     """Run a Django management command with optional arguments."""
     cmd = [PYTHON_PATH, "manage.py", command_name]
